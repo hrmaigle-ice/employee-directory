@@ -1,0 +1,1560 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ระบบทะเบียนรายชื่อพนักงาน - Aigle Company Limited</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Lucide Icons CDN -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- html2canvas สำหรับแปลง HTML เป็นรูปภาพ -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&display=swap');
+        body {
+            font-family: 'Sarabun', sans-serif;
+            background-color: #f1f5f9;
+        }
+        .excel-grid {
+            border-collapse: collapse;
+        }
+        .excel-grid th, .excel-grid td {
+            border: 1px solid #cbd5e1;
+        }
+        .custom-scrollbar::-webkit-scrollbar {
+            height: 8px;
+            width: 8px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: #f1f5f9;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #94a3b8;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body class="bg-slate-100 text-slate-800 antialiased min-h-screen flex flex-col">
+
+    <!-- Header / Navbar พร้อมชื่อบริษัทและโลโก้ -->
+    <header class="bg-[#045c3e] text-white shadow-md sticky top-0 z-35">
+        <div class="max-w-7xl mx-auto px-4 py-3 flex flex-wrap justify-between items-center gap-3">
+            <div class="flex items-center space-x-3">
+                <div id="companyLogoDisplay" class="w-11 h-11 bg-white rounded-lg overflow-hidden border border-emerald-500/40 shadow-inner flex items-center justify-center shrink-0 cursor-pointer" onclick="document.getElementById('companyLogoInput').click()" title="คลิกเพื่อเปลี่ยนโลโก้บริษัท">
+                    <img id="companyLogoImg" src="" class="w-full h-full object-contain hidden" alt="Logo">
+                    <i id="companyLogoIcon" data-lucide="building-2" class="w-6 h-6 text-[#045c3e]"></i>
+                </div>
+                <input type="file" id="companyLogoInput" accept="image/*" onchange="previewCompanyLogo(event)" class="hidden">
+                
+                <div>
+                    <div class="flex items-center space-x-2">
+                        <h1 id="companyNameDisplay" class="text-lg sm:text-xl font-bold leading-tight tracking-wide">บริษัท ไอเกิ้ล จำกัด (Aigle Company Limited)</h1>
+                    </div>
+                    <p class="text-xs text-emerald-200 opacity-90">ระบบทะเบียนรายชื่อพนักงานและประวัติหลักสูตรอบรม</p>
+                </div>
+            </div>
+            <div class="flex items-center space-x-2.5">
+                <!-- ปุ่มนำเข้า CSV -->
+                <button onclick="document.getElementById('importCsvInput').click()" class="flex items-center space-x-1.5 bg-[#0284c7] hover:bg-[#0369a1] text-white text-xs sm:text-sm px-3.5 py-2 rounded-lg transition shadow-sm font-medium">
+                    <i data-lucide="upload" class="w-4 h-4"></i>
+                    <span>นำเข้า CSV</span>
+                </button>
+                <input type="file" id="importCsvInput" accept=".csv" onchange="importFromCSV(event)" class="hidden">
+
+                <!-- ปุ่มส่งออก CSV -->
+                <button onclick="exportToCSV()" class="flex items-center space-x-1.5 bg-[#067a53] hover:bg-[#056846] text-white text-xs sm:text-sm px-3.5 py-2 rounded-lg transition border border-emerald-500/40 shadow-sm font-medium">
+                    <i data-lucide="download" class="w-4 h-4"></i>
+                    <span>ส่งออก CSV</span>
+                </button>
+
+                <!-- ปุ่มบันทึกเป็นรูปภาพ -->
+                <button onclick="exportTableAsImage()" class="flex items-center space-x-1.5 bg-[#0891b2] hover:bg-[#0e7490] text-white text-xs sm:text-sm px-3.5 py-2 rounded-lg transition shadow-sm font-medium">
+                    <i data-lucide="image" class="w-4 h-4"></i>
+                    <span>บันทึกตารางเป็นรูปภาพ</span>
+                </button>
+
+                <!-- ปุ่มเพิ่มพนักงาน -->
+                <button onclick="openAddModal()" class="flex items-center space-x-1.5 bg-[#f59e0b] hover:bg-[#d97706] text-slate-950 font-bold text-xs sm:text-sm px-4 py-2 rounded-lg transition shadow-md">
+                    <i data-lucide="user-plus" class="w-4 h-4"></i>
+                    <span>+ เพิ่มพนักงาน</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main id="captureArea" class="flex-grow max-w-7xl w-full mx-auto p-4 sm:p-6 space-y-4 bg-slate-100">
+
+        <!-- Controls / Search & Filters -->
+        <div class="bg-white p-3.5 rounded-2xl shadow-sm border border-slate-200/80 flex flex-col md:flex-row gap-3 justify-between items-center">
+            <div class="relative w-full md:w-96">
+                <i data-lucide="search" class="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"></i>
+                <input type="text" id="searchInput" oninput="filterEmployees()" placeholder="ค้นหาชื่อไทย/อังกฤษ, รหัส, ตำแหน่ง, เลขบัตร..." class="w-full pl-9 pr-4 py-2 text-sm border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-600 focus:outline-none placeholder:text-slate-400">
+            </div>
+
+            <div class="flex flex-wrap items-center gap-2.5 w-full md:w-auto justify-end">
+                <select id="departmentFilter" onchange="filterEmployees()" class="text-sm border border-slate-300 rounded-xl px-3 py-2 bg-white focus:ring-2 focus:ring-emerald-600 focus:outline-none text-slate-700 font-medium">
+                    <option value="">ทุกแผนก/ฝ่าย</option>
+                </select>
+
+                <select id="statusFilter" onchange="filterEmployees()" class="text-sm border border-slate-300 rounded-xl px-3 py-2 bg-white focus:ring-2 focus:ring-emerald-600 focus:outline-none text-slate-700 font-medium">
+                    <option value="">ทุกสถานะ</option>
+                    <option value="ทำงานอยู่">ทำงานอยู่</option>
+                    <option value="ทดลองงาน">ทดลองงาน</option>
+                    <option value="ลาออก">ลาออก</option>
+                </select>
+
+                <button onclick="resetFilters()" title="รีเซ็ตตัวกรอง" class="flex items-center space-x-1 px-3 py-2 text-sm border border-slate-300 rounded-xl hover:bg-slate-100 text-slate-600 font-medium transition">
+                    <i data-lucide="rotate-ccw" class="w-4 h-4"></i>
+                    <span>รีเซ็ต</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Summary Cards -->
+        <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
+            <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-200/80 flex items-center space-x-3.5">
+                <div class="p-3 bg-emerald-50 text-emerald-600 rounded-xl border border-emerald-100">
+                    <i data-lucide="users" class="w-6 h-6"></i>
+                </div>
+                <div>
+                    <p class="text-xs font-semibold text-slate-500">พนักงานทั้งหมด</p>
+                    <p id="totalCount" class="text-2xl font-extrabold text-slate-800">0</p>
+                </div>
+            </div>
+            <!-- เพศชาย -->
+            <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-200/80 flex items-center space-x-3.5">
+                <div class="p-3 bg-sky-50 text-sky-600 rounded-xl border border-sky-100">
+                    <i data-lucide="user" class="w-6 h-6"></i>
+                </div>
+                <div>
+                    <p class="text-xs font-semibold text-slate-500">เพศชาย</p>
+                    <p id="maleCount" class="text-2xl font-extrabold text-sky-700">0</p>
+                </div>
+            </div>
+            <!-- เพศหญิง -->
+            <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-200/80 flex items-center space-x-3.5">
+                <div class="p-3 bg-pink-50 text-pink-600 rounded-xl border border-pink-100">
+                    <i data-lucide="user" class="w-6 h-6"></i>
+                </div>
+                <div>
+                    <p class="text-xs font-semibold text-slate-500">เพศหญิง</p>
+                    <p id="femaleCount" class="text-2xl font-extrabold text-pink-700">0</p>
+                </div>
+            </div>
+            <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-200/80 flex items-center space-x-3.5">
+                <div class="p-3 bg-blue-50 text-blue-600 rounded-xl border border-blue-100">
+                    <i data-lucide="user-check" class="w-6 h-6"></i>
+                </div>
+                <div>
+                    <p class="text-xs font-semibold text-slate-500">ทำงานอยู่ (Active)</p>
+                    <p id="activeCount" class="text-2xl font-extrabold text-slate-800">0</p>
+                </div>
+            </div>
+            <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-200/80 flex items-center space-x-3.5">
+                <div class="p-3 bg-amber-50 text-amber-600 rounded-xl border border-amber-100">
+                    <i data-lucide="clock" class="w-6 h-6"></i>
+                </div>
+                <div>
+                    <p class="text-xs font-semibold text-slate-500">ทดลองงาน (Probation)</p>
+                    <p id="probationCount" class="text-2xl font-extrabold text-slate-800">0</p>
+                </div>
+            </div>
+            <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-200/80 flex items-center space-x-3.5">
+                <div class="p-3 bg-rose-50 text-rose-600 rounded-xl border border-rose-100">
+                    <i data-lucide="user-x" class="w-6 h-6"></i>
+                </div>
+                <div>
+                    <p class="text-xs font-semibold text-slate-500">พนักงานลาออก</p>
+                    <p id="resignedCount" class="text-2xl font-extrabold text-slate-800">0</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Excel-like Data Table Container -->
+        <div class="bg-white rounded-2xl shadow-sm border border-slate-200/80 overflow-hidden">
+            <div class="bg-slate-50 border-b border-slate-200 px-4 py-2.5 flex justify-between items-center text-xs text-slate-500">
+                <div class="flex items-center space-x-2">
+                    <span class="inline-block w-2.5 h-2.5 bg-emerald-500 rounded-full"></span>
+                    <span class="font-bold text-slate-700">ตารางทะเบียนรายชื่อพนักงาน (Excel Grid View)</span>
+                </div>
+                <div>
+                    <span id="showingText" class="font-semibold text-slate-600">แสดงทั้งหมด 0 รายการ</span>
+                </div>
+            </div>
+
+            <div class="overflow-x-auto custom-scrollbar">
+                <table class="w-full text-left text-sm border-collapse excel-grid whitespace-nowrap">
+                    <thead>
+                        <tr class="bg-slate-100 text-slate-700 font-bold text-xs uppercase tracking-wider">
+                            <th class="p-3 text-center w-12">#</th>
+                            <th class="p-3 text-center w-16">รูปถ่าย</th>
+                            <th class="p-3">รหัสพนักงาน</th>
+                            <th class="p-3">ชื่อ-นามสกุล (ไทย)</th>
+                            <th class="p-3">FULL NAME (ENG)</th>
+                            <th class="p-3 text-center">เพศ</th>
+                            <th class="p-3">ตำแหน่ง</th>
+                            <th class="p-3">แผนก/ฝ่าย</th>
+                            <th class="p-3 text-center">สถานะ</th>
+                            <th class="p-3 text-center w-28 no-print">การจัดการ</th>
+                        </tr>
+                    </thead>
+                    <tbody id="employeeTableBody" class="divide-y divide-slate-200 bg-white">
+                        <!-- Dynamic rows -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </main>
+
+    <!-- Modal Form (Add / Edit Employee) -->
+    <div id="employeeModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm hidden items-center justify-center p-2 sm:p-4 z-50">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[92vh] flex flex-col overflow-hidden">
+            <div class="bg-[#045c3e] px-6 py-3.5 text-white flex justify-between items-center shrink-0">
+                <div class="flex items-center space-x-2">
+                    <i data-lucide="user-cog" class="w-5 h-5 text-emerald-300"></i>
+                    <h3 id="modalTitle" class="text-base font-bold">เพิ่มรายชื่อพนักงานใหม่</h3>
+                </div>
+                <button onclick="closeModal()" class="text-emerald-200 hover:text-white p-1 rounded-lg">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+
+            <form id="employeeForm" onsubmit="saveEmployee(event)" class="p-6 overflow-y-auto space-y-6 custom-scrollbar text-xs sm:text-sm">
+                <input type="hidden" id="empIdIndex">
+
+                <!-- Photo Section -->
+                <div class="bg-slate-50 p-4 rounded-xl border border-slate-200 flex flex-col sm:flex-row items-center gap-4">
+                    <div class="relative w-24 h-28 rounded-xl border-2 border-dashed border-slate-300 flex items-center justify-center overflow-hidden bg-white shrink-0 group cursor-pointer shadow-sm">
+                        <img id="imagePreview" src="" class="w-full h-full object-cover hidden" alt="Employee Photo">
+                        <div id="imagePlaceholder" class="flex flex-col items-center text-slate-400 group-hover:text-emerald-600">
+                            <i data-lucide="camera" class="w-7 h-7"></i>
+                            <span class="text-[10px] mt-1">อัปโหลดรูป</span>
+                        </div>
+                        <input type="file" id="photoInput" accept="image/*" onchange="previewImage(event)" class="absolute inset-0 opacity-0 cursor-pointer">
+                    </div>
+                    <div>
+                        <h4 class="font-bold text-slate-700 text-sm">รูปถ่ายประจำตัวพนักงาน (กรอบสี่เหลี่ยมแนวตั้ง)</h4>
+                        <p class="text-xs text-slate-500 mt-1">ระบบจะปรับขนาดพอดีกรอบสี่เหลี่ยมอัตโนมัติ ไม่ล้นขอบ</p>
+                    </div>
+                </div>
+
+                <!-- Section 1: ข้อมูลการทำงาน -->
+                <div>
+                    <h4 class="text-sm font-bold text-emerald-800 border-b border-emerald-200 pb-1.5 mb-3 flex items-center gap-1.5">
+                        <i data-lucide="briefcase" class="w-4 h-4"></i> ข้อมูลการทำงานและสถานะ
+                    </h4>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3.5">
+                        <div>
+                            <label class="block font-semibold text-slate-700 mb-1">รหัสพนักงาน <span class="text-rose-500">*</span></label>
+                            <input type="text" id="empCode" required placeholder="EMP-001" class="w-full px-3 py-1.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+                        </div>
+                        <div>
+                            <label class="block font-semibold text-slate-700 mb-1">ตำแหน่ง <span class="text-rose-500">*</span></label>
+                            <input type="text" id="empPosition" required placeholder="พิมพ์ตำแหน่ง..." class="w-full px-3 py-1.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+                        </div>
+                        <div>
+                            <label class="block font-semibold text-slate-700 mb-1">แผนก/ฝ่าย <span class="text-rose-500">*</span></label>
+                            <input type="text" id="empDept" required placeholder="พิมพ์ชื่อแผนก/ฝ่าย..." class="w-full px-3 py-1.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+                        </div>
+                        <div>
+                            <label class="block font-semibold text-slate-700 mb-1">วันที่เริ่มงาน <span class="text-rose-500">*</span></label>
+                            <input type="date" id="empStartDate" required onchange="calculateDatesAndTenure()" class="w-full px-3 py-1.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+                        </div>
+                        <div>
+                            <label class="block font-semibold text-slate-700 mb-1">วันสิ้นสุดทดลองงาน 90 วัน</label>
+                            <input type="date" id="empProbationEndDate" readonly class="w-full px-3 py-1.5 bg-slate-100 border border-slate-300 rounded-lg focus:outline-none text-slate-600 font-medium">
+                        </div>
+                        <div>
+                            <label class="block font-semibold text-slate-700 mb-1">สถานะพนักงาน</label>
+                            <select id="empStatus" onchange="toggleResignDate()" class="w-full px-3 py-1.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:outline-none bg-white">
+                                <option value="ทำงานอยู่">ทำงานอยู่ (Active)</option>
+                                <option value="ทดลองงาน">ทดลองงาน (Probation)</option>
+                                <option value="ลาออก">ลาออก (Resigned)</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block font-semibold text-slate-700 mb-1">อายุงาน (คำนวณให้อัตโนมัติ)</label>
+                            <input type="text" id="empTenureDisplay" readonly placeholder="คำนวณให้อัตโนมัติ" class="w-full px-3 py-1.5 bg-slate-100 border border-slate-300 rounded-lg text-slate-600">
+                        </div>
+                        <div>
+                            <label class="block font-semibold text-slate-700 mb-1">วันที่ลาออก (ถ้ามี)</label>
+                            <input type="date" id="empResignDate" onchange="calculateDatesAndTenure()" class="w-full px-3 py-1.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Section 2: ข้อมูลส่วนตัว -->
+                <div>
+                    <h4 class="text-sm font-bold text-emerald-800 border-b border-emerald-200 pb-1.5 mb-3 flex items-center gap-1.5">
+                        <i data-lucide="user" class="w-4 h-4"></i> ข้อมูลส่วนบุคคล
+                    </h4>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3.5">
+                        <div>
+                            <label class="block font-semibold text-slate-700 mb-1">คำนำหน้า (ไทย)</label>
+                            <select id="empPrefixTh" class="w-full px-3 py-1.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:outline-none bg-white">
+                                <option value="นาย">นาย</option>
+                                <option value="นาง">นาง</option>
+                                <option value="นางสาว">นางสาว</option>
+                            </select>
+                        </div>
+                        <div class="sm:col-span-2">
+                            <label class="block font-semibold text-slate-700 mb-1">ชื่อ-สกุล จริง (ภาษาไทย) <span class="text-rose-500">*</span></label>
+                            <input type="text" id="empNameTh" required placeholder="สมชาย ใจดี" class="w-full px-3 py-1.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+                        </div>
+                        <div>
+                            <label class="block font-semibold text-slate-700 mb-1">คำนำหน้า (อังกฤษ)</label>
+                            <select id="empPrefixEn" class="w-full px-3 py-1.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:outline-none bg-white">
+                                <option value="">(ไม่ระบุ)</option>
+                                <option value="Mr.">Mr.</option>
+                                <option value="Mrs.">Mrs.</option>
+                                <option value="Ms.">Ms.</option>
+                            </select>
+                        </div>
+                        <div class="sm:col-span-2">
+                            <label class="block font-semibold text-slate-700 mb-1">ชื่อ-สกุล (ภาษาอังกฤษ)</label>
+                            <input type="text" id="empNameEn" placeholder="Somchai Jaidee" class="w-full px-3 py-1.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+                        </div>
+                        <div>
+                            <label class="block font-semibold text-slate-700 mb-1">เพศ</label>
+                            <select id="empGender" class="w-full px-3 py-1.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:outline-none bg-white">
+                                <option value="ชาย">ชาย</option>
+                                <option value="หญิง">หญิง</option>
+                                <option value="อื่นๆ">อื่นๆ</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block font-semibold text-slate-700 mb-1">วันเกิด</label>
+                            <input type="date" id="empBirthDate" onchange="calculateAge()" class="w-full px-3 py-1.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+                        </div>
+                        <div>
+                            <label class="block font-semibold text-slate-700 mb-1">อายุ (ปี)</label>
+                            <input type="number" id="empAge" readonly placeholder="คำนวณอัตโนมัติ" class="w-full px-3 py-1.5 bg-slate-100 border border-slate-300 rounded-lg text-slate-600">
+                        </div>
+                        <div>
+                            <label class="block font-semibold text-slate-700 mb-1">หมู่เลือด</label>
+                            <select id="empBloodType" class="w-full px-3 py-1.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:outline-none bg-white">
+                                <option value="ไม่ระบุ">ไม่ระบุ</option>
+                                <option value="A">A</option>
+                                <option value="B">B</option>
+                                <option value="O">O</option>
+                                <option value="AB">AB</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block font-semibold text-slate-700 mb-1">เลขที่บัตรประชาชน (13 หลัก)</label>
+                            <input type="text" id="empIdCard" maxlength="13" placeholder="1100200300400" class="w-full px-3 py-1.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+                        </div>
+                        <div>
+                            <label class="block font-semibold text-slate-700 mb-1">เชื้อชาติ</label>
+                            <input type="text" id="empEthnicity" value="ไทย" class="w-full px-3 py-1.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+                        </div>
+                        <div>
+                            <label class="block font-semibold text-slate-700 mb-1">สัญชาติ</label>
+                            <input type="text" id="empNationality" value="ไทย" class="w-full px-3 py-1.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+                        </div>
+                        <div>
+                            <label class="block font-semibold text-slate-700 mb-1">ศาสนา</label>
+                            <input type="text" id="empReligion" value="พุทธ" class="w-full px-3 py-1.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Section 3: การติดต่อและที่อยู่ -->
+                <div>
+                    <h4 class="text-sm font-bold text-emerald-800 border-b border-emerald-200 pb-1.5 mb-3 flex items-center gap-1.5">
+                        <i data-lucide="map-pin" class="w-4 h-4"></i> ข้อมูลการติดต่อและที่อยู่
+                    </h4>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                        <div>
+                            <label class="block font-semibold text-slate-700 mb-1">เบอร์โทรศัพท์</label>
+                            <input type="tel" id="empPhone" placeholder="081-234-5678" class="w-full px-3 py-1.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+                        </div>
+                        <div>
+                            <label class="block font-semibold text-slate-700 mb-1">อีเมล</label>
+                            <input type="email" id="empEmail" placeholder="somchai@company.com" class="w-full px-3 py-1.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+                        </div>
+                        <div>
+                            <label class="block font-semibold text-slate-700 mb-1">ชื่อบุคคลติดต่อฉุกเฉิน</label>
+                            <input type="text" id="empEmergencyName" placeholder="นางสมศรี ใจดี (มารดา)" class="w-full px-3 py-1.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+                        </div>
+                        <div>
+                            <label class="block font-semibold text-slate-700 mb-1">เบอร์ติดต่อฉุกเฉิน</label>
+                            <input type="tel" id="empEmergencyPhone" placeholder="089-876-5432" class="w-full px-3 py-1.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+                        </div>
+                        <div class="sm:col-span-2">
+                            <label class="block font-semibold text-slate-700 mb-1">ที่อยู่ปัจจุบัน</label>
+                            <input type="text" id="empCurrentAddress" placeholder="123/45 แขวง/ตำบล เขต/อำเภอ จังหวัด..." class="w-full px-3 py-1.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+                        </div>
+                        <div class="sm:col-span-2">
+                            <label class="block font-semibold text-slate-700 mb-1">ที่อยู่ตามบัตรประชาชน</label>
+                            <input type="text" id="empCardAddress" placeholder="123/45 แขวง/ตำบล เขต/อำเภอ จังหวัด..." class="w-full px-3 py-1.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Section 4: บัญชี การศึกษา และสวัสดิการ -->
+                <div>
+                    <h4 class="text-sm font-bold text-emerald-800 border-b border-emerald-200 pb-1.5 mb-3 flex items-center gap-1.5">
+                        <i data-lucide="graduation-cap" class="w-4 h-4"></i> ข้อมูลการศึกษา ธนาคาร และประกันสังคม
+                    </h4>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3.5">
+                        <div>
+                            <label class="block font-semibold text-slate-700 mb-1">เลขที่บัญชีกสิกรไทย</label>
+                            <input type="text" id="empKasikornAcc" placeholder="012-3-45678-9" class="w-full px-3 py-1.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+                        </div>
+                        <div>
+                            <label class="block font-semibold text-slate-700 mb-1">วุฒิการศึกษา</label>
+                            <select id="empEducation" class="w-full px-3 py-1.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:outline-none bg-white">
+                                <option value="ไม่ระบุ">ไม่ระบุ</option>
+                                <option value="ปริญญาตรี">ปริญญาตรี</option>
+                                <option value="ปริญญาโท">ปริญญาโท</option>
+                                <option value="ปริญญาเอก">ปริญญาเอก</option>
+                                <option value="ปวส.">ปวส.</option>
+                                <option value="ปวช.">ปวช.</option>
+                                <option value="มัธยมศึกษา">มัธยมศึกษา</option>
+                                <option value="ประถมศึกษา">ประถมศึกษา</option>
+                                <option value="กศน.">กศน.</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block font-semibold text-slate-700 mb-1">สาขาวิชา</label>
+                            <input type="text" id="empMajor" placeholder="วิศวกรรมคอมพิวเตอร์" class="w-full px-3 py-1.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+                        </div>
+                        <div class="sm:col-span-2">
+                            <label class="block font-semibold text-slate-700 mb-1">สถาบันการศึกษา</label>
+                            <input type="text" id="empInstitute" placeholder="มหาวิทยาลัย..." class="w-full px-3 py-1.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+                        </div>
+                        <div>
+                            <label class="block font-semibold text-slate-700 mb-1">โรงพยาบาลประกันสังคม</label>
+                            <input type="text" id="empSsoHospital" placeholder="รพ.จุฬาลงกรณ์" class="w-full px-3 py-1.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Section 5: ประวัติหลักสูตรอบรม (Training Courses - Dynamic Form) -->
+                <div>
+                    <div class="flex justify-between items-center border-b border-emerald-200 pb-1.5 mb-3">
+                        <h4 class="text-sm font-bold text-emerald-800 flex items-center gap-1.5">
+                            <i data-lucide="award" class="w-4 h-4"></i> ประวัติหลักสูตรอบรม / ใบรับรอง (Training & Certifications)
+                            <span class="text-slate-400 font-normal text-xs">(ไม่บังคับกรอก)</span>
+                        </h4>
+                        <button type="button" onclick="addTrainingRow()" class="flex items-center space-x-1 px-2.5 py-1 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 rounded-lg font-semibold text-xs border border-emerald-300 transition">
+                            <i data-lucide="plus" class="w-3.5 h-3.5"></i>
+                            <span>+ เพิ่มหลักสูตรอบรม</span>
+                        </button>
+                    </div>
+
+                    <div class="space-y-2" id="trainingContainer">
+                        <!-- Dynamic Rows for Training -->
+                    </div>
+                </div>
+
+                <!-- Modal Actions -->
+                <div class="flex justify-end space-x-3 pt-4 border-t border-slate-200">
+                    <button type="button" onclick="closeModal()" class="px-5 py-2 border border-slate-300 rounded-lg text-slate-600 hover:bg-slate-100 font-medium transition">ยกเลิก</button>
+                    <button type="submit" class="px-6 py-2 bg-[#045c3e] hover:bg-[#03462f] text-white rounded-lg font-medium shadow-md transition">บันทึกข้อมูล</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal View Details -->
+    <div id="detailModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm hidden items-center justify-center p-2 sm:p-4 z-50">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[92vh] flex flex-col overflow-hidden">
+            <div class="bg-slate-800 px-6 py-3.5 text-white flex justify-between items-center shrink-0">
+                <div class="flex items-center space-x-2">
+                    <i data-lucide="file-text" class="w-5 h-5 text-emerald-400"></i>
+                    <h3 class="text-base font-bold">รายละเอียดข้อมูลพนักงานอย่างละเอียด</h3>
+                </div>
+                <button onclick="closeDetailModal()" class="text-slate-300 hover:text-white p-1 rounded-lg">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+
+            <!-- Content Area -->
+            <div id="detailCaptureArea" class="p-6 overflow-y-auto space-y-6 custom-scrollbar text-xs sm:text-sm bg-white">
+                <!-- Dynamic Insertion -->
+            </div>
+
+            <!-- Footer พร้อมปุ่มสั่งพิมพ์และบันทึกรูป -->
+            <div class="bg-slate-50 px-6 py-3 border-t border-slate-200 flex flex-wrap justify-between items-center gap-2 shrink-0">
+                <div class="flex items-center space-x-2">
+                    <button onclick="printDetail()" class="flex items-center space-x-1.5 px-4 py-2 bg-[#045c3e] hover:bg-[#03462f] text-white rounded-lg font-medium text-xs sm:text-sm transition shadow-sm">
+                        <i data-lucide="printer" class="w-4 h-4"></i>
+                        <span>พิมพ์เอกสาร / PDF</span>
+                    </button>
+                    <button onclick="exportDetailAsImage()" class="flex items-center space-x-1.5 px-4 py-2 bg-[#0891b2] hover:bg-[#0e7490] text-white rounded-lg font-medium text-xs sm:text-sm transition shadow-sm">
+                        <i data-lucide="image" class="w-4 h-4"></i>
+                        <span>บันทึกประวัติเป็นรูปภาพ</span>
+                    </button>
+                </div>
+                <button onclick="closeDetailModal()" class="px-5 py-2 bg-slate-700 hover:bg-slate-800 text-white rounded-lg font-medium text-xs sm:text-sm transition">ปิดหน้าต่าง</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Custom Delete Modal -->
+    <div id="deleteModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm hidden items-center justify-center p-4 z-50">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 text-center space-y-4 transform transition-all scale-100">
+            <div class="w-16 h-16 bg-amber-100 text-amber-500 rounded-full flex items-center justify-center mx-auto shadow-inner">
+                <i data-lucide="help-circle" class="w-10 h-10"></i>
+            </div>
+            
+            <div class="space-y-1">
+                <h3 class="text-xl font-bold text-slate-800">ยืนยันการลบข้อมูล</h3>
+                <p id="deleteMessage" class="text-sm text-slate-500 font-medium leading-relaxed px-2">
+                    คุณแน่ใจหรือว่าต้องการลบพนักงานออกจากระบบ?
+                </p>
+            </div>
+
+            <div class="flex justify-center space-x-3 pt-2">
+                <button onclick="closeDeleteModal()" class="px-6 py-2.5 border border-slate-300 rounded-xl text-slate-600 hover:bg-slate-100 font-semibold text-sm transition">
+                    ยกเลิก
+                </button>
+                <button id="confirmDeleteBtn" onclick="executeDelete()" class="px-6 py-2.5 bg-[#e11d48] hover:bg-[#be123c] text-white rounded-xl font-semibold text-sm shadow-md transition">
+                    ยืนยันลบ
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Script Logic -->
+    <script>
+        let currentViewEmpCode = '';
+        let targetDeleteCode = '';
+        let globalCompanyLogo = localStorage.getItem('globalCompanyLogo') || '';
+        let globalCompanyName = 'บริษัท ไอเกิ้ล จำกัด (Aigle Company Limited)';
+
+        let employees = [];
+        let currentImageData = '';
+
+        // ** เชื่อมต่อกับ Google Apps Script Web App URL ที่คุณให้มาเรียบร้อยแล้ว **
+        const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxzARstxt9ZXJqtntHaIZybKAcccT8nQ4WiJ6R0wQsJljB0syCqjkMGOBdb4OnMdOCn/exec';
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            if (globalCompanyLogo) {
+                const img = document.getElementById('companyLogoImg');
+                img.src = globalCompanyLogo;
+                img.classList.remove('hidden');
+                document.getElementById('companyLogoIcon').classList.add('hidden');
+            }
+            
+            // โหลดข้อมูลจาก Google Sheets
+            await loadEmployeesFromCloud();
+            lucide.createIcons();
+        });
+
+        // --- ฟังก์ชันดึงข้อมูลจาก Google Sheets ---
+        async function loadEmployeesFromCloud() {
+            if (!GOOGLE_SCRIPT_URL || GOOGLE_SCRIPT_URL === 'YOUR_WEB_APP_URL_HERE') {
+                employees = JSON.parse(localStorage.getItem('employees')) || [];
+                updateDeptFilterOptions();
+                renderTable();
+                return;
+            }
+
+            try {
+                const response = await fetch(GOOGLE_SCRIPT_URL);
+                const data = await response.json();
+                employees = data;
+                updateDeptFilterOptions();
+                renderTable();
+            } catch (error) {
+                console.error('ไม่สามารถโหลดข้อมูลจาก Google Sheets ได้:', error);
+                employees = JSON.parse(localStorage.getItem('employees')) || [];
+                updateDeptFilterOptions();
+                renderTable();
+            }
+        }
+
+        // --- ฟังก์ชันบันทึกข้อมูลไปยัง Google Sheets ---
+        async function saveEmployeesToCloud() {
+            localStorage.setItem('employees', JSON.stringify(employees));
+
+            if (!GOOGLE_SCRIPT_URL || GOOGLE_SCRIPT_URL === 'YOUR_WEB_APP_URL_HERE') {
+                return;
+            }
+
+            try {
+                await fetch(GOOGLE_SCRIPT_URL, {
+                    method: 'POST',
+                    mode: 'no-cors',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(employees)
+                });
+            } catch (error) {
+                console.error('บันทึกข้อมูลไป Google Sheets ไม่สำเร็จ:', error);
+            }
+        }
+
+        // --- ฟังก์ชันแปลงวันที่เป็นรูปแบบ "วันที่ ชื่อเดือนภาษาไทยเต็ม ปีพ.ศ.เต็ม" (เช่น 1 มกราคม 2561) ---
+        function formatDateToThaiBE(dateStr) {
+            if (!dateStr || dateStr === '-' || dateStr === 'undefined') return '-';
+            
+            const thaiMonthsFull = [
+                'มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน',
+                'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม'
+            ];
+
+            let str = String(dateStr).trim();
+            let year, month, day;
+
+            if (str.includes('-')) {
+                const parts = str.split('-');
+                if (parts.length === 3) {
+                    year = parseInt(parts[0], 10);
+                    month = parseInt(parts[1], 10) - 1;
+                    day = parseInt(parts[2], 10);
+                }
+            } else if (str.includes('/')) {
+                const parts = str.split('/');
+                if (parts.length === 3) {
+                    const p1 = parseInt(parts[0], 10);
+                    const p2 = parseInt(parts[1], 10);
+                    const p3 = parseInt(parts[2], 10);
+
+                    if (p1 <= 12 && p2 > 12) {
+                        month = p1 - 1;
+                        day = p2;
+                        year = p3;
+                    } else {
+                        day = p1;
+                        month = p2 - 1;
+                        year = p3;
+                    }
+                }
+            }
+
+            if (!isNaN(day) && !isNaN(month) && !isNaN(year) && month >= 0 && month < 12) {
+                const yearBE = year < 2400 ? year + 543 : year;
+                return `${day} ${thaiMonthsFull[month]} ${yearBE}`;
+            }
+
+            return dateStr;
+        }
+
+        // --- ฟังก์ชันแปลงเลขบัตรประชาชนเป็นรูปแบบ 0-0000-00000-00-0 และแก้ปัญหา E+12 ---
+        function formatIdCard(id) {
+            if (!id) return '-';
+            
+            let cleanId = String(id).trim();
+
+            if (cleanId.includes('E+') || cleanId.includes('e+')) {
+                cleanId = Number(cleanId).toLocaleString('fullwide', { useGrouping: false });
+            } else {
+                cleanId = cleanId.replace(/\D/g, '');
+            }
+
+            if (cleanId.length === 13) {
+                return `${cleanId[0]}-${cleanId.slice(1, 5)}-${cleanId.slice(5, 10)}-${cleanId.slice(10, 12)}-${cleanId[12]}`;
+            }
+            
+            return id;
+        }
+
+        function previewCompanyLogo(event) {
+            const file = event.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    globalCompanyLogo = e.target.result;
+                    localStorage.setItem('globalCompanyLogo', globalCompanyLogo);
+                    const img = document.getElementById('companyLogoImg');
+                    img.src = globalCompanyLogo;
+                    img.classList.remove('hidden');
+                    document.getElementById('companyLogoIcon').classList.add('hidden');
+                };
+                reader.readAsDataURL(file);
+            }
+        }
+
+        function previewImage(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const img = new Image();
+                img.onload = function() {
+                    const canvas = document.createElement('canvas');
+                    const width = 300;
+                    const height = 350; 
+                    canvas.width = width;
+                    canvas.height = height;
+                    const ctx = canvas.getContext('2d');
+
+                    ctx.fillStyle = "#ffffff";
+                    ctx.fillRect(0, 0, width, height);
+
+                    let imgW = img.width;
+                    let imgH = img.height;
+                    let drawW = width;
+                    let drawH = (imgH / imgW) * width;
+                    let offsetX = 0;
+                    let offsetY = (height - drawH) / 2;
+
+                    if (drawH < height) {
+                        drawH = height;
+                        drawW = (imgW / imgH) * height;
+                        offsetX = (width - drawW) / 2;
+                        offsetY = 0;
+                    }
+
+                    ctx.drawImage(img, offsetX, offsetY, drawW, drawH);
+                    currentImageData = canvas.toDataURL('image/jpeg', 0.85);
+
+                    const preview = document.getElementById('imagePreview');
+                    preview.src = currentImageData;
+                    preview.classList.remove('hidden');
+                    document.getElementById('imagePlaceholder').classList.add('hidden');
+                };
+                img.src = e.target.result;
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function addTrainingRow(year = '', name = '', institute = '') {
+            const container = document.getElementById('trainingContainer');
+            const rowId = 'training_row_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4);
+
+            const div = document.createElement('div');
+            div.id = rowId;
+            div.className = "grid grid-cols-12 gap-2 items-center bg-slate-50 p-2 rounded-lg border border-slate-200";
+
+            div.innerHTML = `
+                <div class="col-span-3 sm:col-span-2">
+                    <input type="text" placeholder="ปี พ.ศ." value="${year}" class="training-year w-full px-2 py-1 border border-slate-300 rounded focus:ring-1 focus:ring-emerald-500 text-xs">
+                </div>
+                <div class="col-span-9 sm:col-span-5">
+                    <input type="text" placeholder="ชื่อหลักสูตร / ใบรับรอง" value="${name}" class="training-name w-full px-2 py-1 border border-slate-300 rounded focus:ring-1 focus:ring-emerald-500 text-xs">
+                </div>
+                <div class="col-span-10 sm:col-span-4">
+                    <input type="text" placeholder="สถาบันผู้ออกใบรับรอง" value="${institute}" class="training-institute w-full px-2 py-1 border border-slate-300 rounded focus:ring-1 focus:ring-emerald-500 text-xs">
+                </div>
+                <div class="col-span-2 sm:col-span-1 text-center">
+                    <button type="button" onclick="removeTrainingRow('${rowId}')" class="text-rose-500 hover:text-rose-700 p-1" title="ลบ">
+                        <i data-lucide="trash-2" class="w-4 h-4 mx-auto"></i>
+                    </button>
+                </div>
+            `;
+
+            container.appendChild(div);
+            lucide.createIcons();
+        }
+
+        function removeTrainingRow(rowId) {
+            const row = document.getElementById(rowId);
+            if (row) row.remove();
+        }
+
+        function getTrainingDataFromForm() {
+            const rows = document.querySelectorAll('#trainingContainer > div');
+            const list = [];
+            rows.forEach(row => {
+                const year = row.querySelector('.training-year').value.trim();
+                const name = row.querySelector('.training-name').value.trim();
+                const institute = row.querySelector('.training-institute').value.trim();
+                if (year || name || institute) {
+                    list.push({ year, name, institute });
+                }
+            });
+            return list;
+        }
+
+        function parseTrainingData(raw) {
+            if (!raw) return [];
+            if (Array.isArray(raw)) return raw;
+            if (typeof raw === 'object') return [raw];
+            
+            if (typeof raw === 'string') {
+                let str = raw.trim();
+                if (!str || str === '-') return [];
+                
+                if (str.startsWith('[')) {
+                    try { 
+                        return JSON.parse(str); 
+                    } catch(e) {
+                        try {
+                            const fixedJson = str
+                                .replace(/([{,])\s*([a-zA-Z0-9_]+)\s*:/g, '$1"$2":')
+                                .replace(/:\s*([^,}\]\s"][^,}\]]*)/g, (match, p1) => {
+                                    const trimmed = p1.trim();
+                                    if (trimmed === 'true' || trimmed === 'false' || trimmed === 'null' || !isNaN(trimmed)) {
+                                        return ':' + trimmed;
+                                    }
+                                    return ':"' + trimmed.replace(/"/g, '\\"') + '"';
+                                });
+                            return JSON.parse(fixedJson);
+                        } catch(err) {
+                            console.error('Parse training error:', err);
+                        }
+                    }
+                }
+                
+                const items = str.split(';');
+                return items.map(item => {
+                    const match = item.match(/\[(.*?)\]\s*(.*?)\s*\((.*?)\)/);
+                    if (match) {
+                        return { year: match[1], name: match[2], institute: match[3] };
+                    }
+                    return { year: '-', name: item.trim(), institute: '-' };
+                });
+            }
+            return [];
+        }
+
+        function populateTrainingForm(trainingData) {
+            const container = document.getElementById('trainingContainer');
+            container.innerHTML = '';
+            const list = parseTrainingData(trainingData);
+            if (list.length === 0) {
+                addTrainingRow();
+            } else {
+                list.forEach(item => addTrainingRow(item.year || '', item.name || '', item.institute || ''));
+            }
+        }
+
+        function importFromCSV(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = async function(e) {
+                const text = e.target.result;
+                const lines = text.split(/\r\n|\n/);
+                if (lines.length <= 1) {
+                    alert('ไฟล์ไม่มีข้อมูล');
+                    return;
+                }
+
+                const parseCSVLine = (line) => {
+                    const res = [];
+                    let current = '';
+                    let inQuotes = false;
+                    for (let i = 0; i < line.length; i++) {
+                        const char = line[i];
+                        if (char === '"') {
+                            inQuotes = !inQuotes;
+                        } else if (char === ',' && !inQuotes) {
+                            res.push(current.trim().replace(/^"|"$/g, ''));
+                            current = '';
+                        } else {
+                            current += char;
+                        }
+                    }
+                    res.push(current.trim().replace(/^"|"$/g, ''));
+                    return res;
+                };
+
+                const newEmployees = [];
+                for (let i = 1; i < lines.length; i++) {
+                    const line = lines[i].trim();
+                    if (!line) continue;
+                    const cols = parseCSVLine(line);
+                    if (cols.length >= 1 && cols[0]) {
+                        const emp = {
+                            code: cols[0] || '',
+                            prefixTh: cols[1] || '',
+                            nameTh: cols[2] || '',
+                            prefixEn: cols[3] || '',
+                            nameEn: cols[4] || '',
+                            position: cols[5] || '',
+                            dept: cols[6] || '',
+                            startDate: cols[7] || '',
+                            probationEndDate: cols[8] || '',
+                            status: cols[10] || 'ทำงานอยู่',
+                            gender: cols[11] || '',
+                            birthDate: cols[12] || '',
+                            age: cols[13] || '',
+                            bloodType: cols[14] || 'ไม่ระบุ',
+                            idCard: cols[15] || '',
+                            ethnicity: cols[16] || 'ไทย',
+                            nationality: cols[17] || 'ไทย',
+                            religion: cols[18] || 'พุทธ',
+                            currentAddress: cols[19] || '',
+                            cardAddress: cols[20] || '',
+                            phone: cols[21] || '',
+                            email: cols[22] || '',
+                            emergencyName: cols[23] || '',
+                            emergencyPhone: cols[24] || '',
+                            kasikornAcc: cols[25] || '',
+                            education: cols[26] || 'ไม่ระบุ',
+                            major: cols[27] || '',
+                            institute: cols[28] || '',
+                            resignDate: cols[29] || '',
+                            ssoHospital: cols[30] || '',
+                            training: parseTrainingData(cols[31]),
+                            photo: cols[32] || ''
+                        };
+                        newEmployees.push(emp);
+                    }
+                }
+
+                if (newEmployees.length > 0) {
+                    employees = newEmployees;
+                    await saveEmployeesToCloud();
+                    updateDeptFilterOptions();
+                    filterEmployees();
+                    alert(`นำเข้าข้อมูลและรูปภาพพนักงานสำเร็จ ${newEmployees.length} รายการ!`);
+                } else {
+                    alert('ไม่พบข้อมูลพนักงานในไฟล์');
+                }
+                event.target.value = '';
+            };
+            reader.readAsText(file, 'UTF-8');
+        }
+
+        function updateDeptFilterOptions() {
+            const deptFilter = document.getElementById('departmentFilter');
+            const currentSelected = deptFilter.value;
+            const depts = Array.from(new Set(employees.map(e => e.dept).filter(Boolean)));
+            deptFilter.innerHTML = '<option value="">ทุกแผนก/ฝ่าย</option>';
+            depts.forEach(d => {
+                const opt = document.createElement('option');
+                opt.value = d;
+                opt.textContent = d;
+                deptFilter.appendChild(opt);
+            });
+            deptFilter.value = currentSelected;
+        }
+
+        function calculateTenure(startDateStr, resignDateStr) {
+            if (!startDateStr) return '-';
+            const start = new Date(startDateStr);
+            const end = resignDateStr ? new Date(resignDateStr) : new Date();
+            if (isNaN(start.getTime())) return '-';
+            let years = end.getFullYear() - start.getFullYear();
+            let months = end.getMonth() - start.getMonth();
+            if (months < 0) { years--; months += 12; }
+            if (years < 0) return '0 ปี 0 เดือน';
+            return `${years} ปี ${months} เดือน`;
+        }
+
+        function renderTable(data = employees) {
+            const tbody = document.getElementById('employeeTableBody');
+            tbody.innerHTML = '';
+
+            if (data.length === 0) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="10" class="text-center py-10 text-slate-400">
+                            <i data-lucide="inbox" class="w-10 h-10 mx-auto mb-2 opacity-50"></i>
+                            ยังไม่มีข้อมูลพนักงาน กดปุ่ม "+ เพิ่มพนักงาน" หรือ "นำเข้า CSV"
+                        </td>
+                    </tr>
+                `;
+                lucide.createIcons();
+                updateStats();
+                return;
+            }
+
+            data.forEach((emp, index) => {
+                const tr = document.createElement('tr');
+                tr.className = "hover:bg-emerald-50/30 transition border-b border-slate-200";
+
+                const photoUrl = emp.photo || 'https://via.placeholder.com/150?text=No+Image';
+                const fullNameEn = (emp.nameEn && emp.nameEn.trim() !== '') ? `${emp.prefixEn || ''} ${emp.nameEn}`.trim() : '<span class="text-slate-400 italic">ไม่ได้ระบุ</span>';
+
+                let statusBadge = '';
+                if(emp.status === 'ทำงานอยู่') statusBadge = `<span class="bg-emerald-100 text-emerald-800 text-xs px-2.5 py-1 rounded-full font-medium">ทำงานอยู่</span>`;
+                else if(emp.status === 'ทดลองงาน') statusBadge = `<span class="bg-amber-100 text-amber-800 text-xs px-2.5 py-1 rounded-full font-medium">ทดลองงาน</span>`;
+                else statusBadge = `<span class="bg-rose-100 text-rose-800 text-xs px-2.5 py-1 rounded-full font-medium">ลาออก</span>`;
+
+                let genderBadge = '';
+                if(emp.gender === 'ชาย') {
+                    genderBadge = `<span class="bg-sky-100 text-sky-800 text-xs px-2.5 py-0.5 rounded-full font-medium">ชาย</span>`;
+                } else if(emp.gender === 'หญิง') {
+                    genderBadge = `<span class="bg-pink-100 text-pink-800 text-xs px-2.5 py-0.5 rounded-full font-medium">หญิง</span>`;
+                } else {
+                    genderBadge = `<span class="bg-slate-100 text-slate-700 text-xs px-2.5 py-0.5 rounded-full">${emp.gender || '-'}</span>`;
+                }
+
+                tr.innerHTML = `
+                    <td class="p-3 text-center text-slate-500 font-mono text-xs">${index + 1}</td>
+                    <td class="p-2 text-center">
+                        <img src="${photoUrl}" class="w-8 h-10 rounded object-cover border border-slate-300 mx-auto shadow-sm" alt="profile">
+                    </td>
+                    <td class="p-3 font-semibold text-emerald-800 font-mono">${emp.code}</td>
+                    <td class="p-3 font-semibold text-slate-800">${emp.prefixTh || ''}${emp.nameTh}</td>
+                    <td class="p-3 text-slate-600">${fullNameEn}</td>
+                    <td class="p-3 text-center">${genderBadge}</td>
+                    <td class="p-3 text-slate-700">${emp.position}</td>
+                    <td class="p-3 text-slate-600">${emp.dept}</td>
+                    <td class="p-3 text-center">${statusBadge}</td>
+                    <td class="p-3 text-center no-print">
+                        <div class="flex justify-center space-x-2">
+                            <button onclick="viewEmployeeDetail('${emp.code}')" title="ดูรายละเอียด" class="p-1 text-emerald-600 hover:text-emerald-800 transition">
+                                <i data-lucide="eye" class="w-4 h-4"></i>
+                            </button>
+                            <button onclick="editEmployee('${emp.code}')" title="แก้ไข" class="p-1 text-blue-600 hover:text-blue-800 transition">
+                                <i data-lucide="pencil" class="w-4 h-4"></i>
+                            </button>
+                            <button onclick="deleteEmployee('${emp.code}')" title="ลบ" class="p-1 text-rose-500 hover:text-rose-700 transition">
+                                <i data-lucide="trash-2" class="w-4 h-4"></i>
+                            </button>
+                        </div>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+
+            lucide.createIcons();
+            updateStats();
+            document.getElementById('showingText').textContent = `แสดงทั้งหมด ${data.length} รายการ`;
+        }
+
+        function updateStats() {
+            document.getElementById('totalCount').textContent = employees.length;
+            document.getElementById('maleCount').textContent = employees.filter(e => e.gender === 'ชาย').length;
+            document.getElementById('femaleCount').textContent = employees.filter(e => e.gender === 'หญิง').length;
+            document.getElementById('activeCount').textContent = employees.filter(e => e.status === 'ทำงานอยู่').length;
+            document.getElementById('probationCount').textContent = employees.filter(e => e.status === 'ทดลองงาน').length;
+            document.getElementById('resignedCount').textContent = employees.filter(e => e.status === 'ลาออก').length;
+        }
+
+        function filterEmployees() {
+            const search = document.getElementById('searchInput').value.toLowerCase().trim();
+            const dept = document.getElementById('departmentFilter').value;
+            const status = document.getElementById('statusFilter').value;
+
+            const filtered = employees.filter(emp => {
+                const matchesSearch = (emp.nameTh && emp.nameTh.toLowerCase().includes(search)) ||
+                                      (emp.code && emp.code.toLowerCase().includes(search)) ||
+                                      (emp.position && emp.position.toLowerCase().includes(search)) ||
+                                      (emp.dept && emp.dept.toLowerCase().includes(search));
+                const matchesDept = dept === '' || emp.dept === dept;
+                const matchesStatus = status === '' || emp.status === status;
+                return matchesSearch && matchesDept && matchesStatus;
+            });
+
+            renderTable(filtered);
+        }
+
+        function resetFilters() {
+            document.getElementById('searchInput').value = '';
+            document.getElementById('departmentFilter').value = '';
+            document.getElementById('statusFilter').value = '';
+            filterEmployees();
+        }
+
+        function calculateAge() {
+            const birthStr = document.getElementById('empBirthDate').value;
+            if (!birthStr) { document.getElementById('empAge').value = ''; return; }
+            const birth = new Date(birthStr);
+            const today = new Date();
+            let age = today.getFullYear() - birth.getFullYear();
+            const m = today.getMonth() - birth.getMonth();
+            if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) age--;
+            document.getElementById('empAge').value = age > 0 ? age : 0;
+        }
+
+        function calculateDatesAndTenure() {
+            const startStr = document.getElementById('empStartDate').value;
+            const resignStr = document.getElementById('empResignDate').value;
+            if (startStr) {
+                const start = new Date(startStr);
+                const prob = new Date(start);
+                prob.setDate(prob.getDate() + 90);
+                document.getElementById('empProbationEndDate').value = prob.toISOString().split('T')[0];
+                document.getElementById('empTenureDisplay').value = calculateTenure(startStr, resignStr);
+            } else {
+                document.getElementById('empProbationEndDate').value = '';
+                document.getElementById('empTenureDisplay').value = '';
+            }
+        }
+
+        function toggleResignDate() {
+            if (document.getElementById('empStatus').value !== 'ลาออก') {
+                document.getElementById('empResignDate').value = '';
+            }
+            calculateDatesAndTenure();
+        }
+
+        function openAddModal() {
+            document.getElementById('modalTitle').textContent = 'เพิ่มรายชื่อพนักงานใหม่';
+            document.getElementById('employeeForm').reset();
+            document.getElementById('empIdIndex').value = '';
+            currentImageData = '';
+            document.getElementById('imagePreview').classList.add('hidden');
+            document.getElementById('imagePlaceholder').classList.remove('hidden');
+            populateTrainingForm([]);
+            document.getElementById('employeeModal').classList.remove('hidden');
+            document.getElementById('employeeModal').classList.add('flex');
+        }
+
+        function closeModal() {
+            document.getElementById('employeeModal').classList.add('hidden');
+            document.getElementById('employeeModal').classList.remove('flex');
+        }
+
+        async function saveEmployee(e) {
+            e.preventDefault();
+            const editIndex = document.getElementById('empIdIndex').value;
+            const code = document.getElementById('empCode').value.trim();
+
+            const newEmp = {
+                code: code,
+                photo: currentImageData || (editIndex !== '' ? employees[editIndex].photo : ''),
+                prefixTh: document.getElementById('empPrefixTh').value,
+                nameTh: document.getElementById('empNameTh').value.trim(),
+                prefixEn: document.getElementById('empPrefixEn').value,
+                nameEn: document.getElementById('empNameEn').value.trim(),
+                position: document.getElementById('empPosition').value.trim(),
+                dept: document.getElementById('empDept').value.trim(),
+                startDate: document.getElementById('empStartDate').value,
+                probationEndDate: document.getElementById('empProbationEndDate').value,
+                status: document.getElementById('empStatus').value,
+                gender: document.getElementById('empGender').value,
+                birthDate: document.getElementById('empBirthDate').value,
+                age: document.getElementById('empAge').value,
+                bloodType: document.getElementById('empBloodType').value,
+                idCard: document.getElementById('empIdCard').value.trim(),
+                ethnicity: document.getElementById('empEthnicity').value.trim(),
+                nationality: document.getElementById('empNationality').value.trim(),
+                religion: document.getElementById('empReligion').value.trim(),
+                currentAddress: document.getElementById('empCurrentAddress').value.trim(),
+                cardAddress: document.getElementById('empCardAddress').value.trim(),
+                phone: document.getElementById('empPhone').value.trim(),
+                email: document.getElementById('empEmail').value.trim(),
+                emergencyPhone: document.getElementById('empEmergencyPhone').value.trim(),
+                emergencyName: document.getElementById('empEmergencyName').value.trim(),
+                kasikornAcc: document.getElementById('empKasikornAcc').value.trim(),
+                education: document.getElementById('empEducation').value,
+                major: document.getElementById('empMajor').value.trim(),
+                institute: document.getElementById('empInstitute').value.trim(),
+                resignDate: document.getElementById('empResignDate').value,
+                ssoHospital: document.getElementById('empSsoHospital').value.trim(),
+                training: getTrainingDataFromForm()
+            };
+
+            if(editIndex !== '') {
+                employees[editIndex] = newEmp;
+            } else {
+                if(employees.some(e => e.code === code)) {
+                    alert('รหัสพนักงานนี้มีในระบบแล้ว!');
+                    return;
+                }
+                employees.push(newEmp);
+            }
+
+            await saveEmployeesToCloud();
+            closeModal();
+            updateDeptFilterOptions();
+            filterEmployees();
+        }
+
+        function editEmployee(code) {
+            const index = employees.findIndex(e => e.code === code);
+            if(index === -1) return;
+            const emp = employees[index];
+
+            document.getElementById('modalTitle').textContent = 'แก้ไขข้อมูลพนักงาน (' + emp.code + ')';
+            document.getElementById('empIdIndex').value = index;
+
+            document.getElementById('empCode').value = emp.code || '';
+            document.getElementById('empPrefixTh').value = emp.prefixTh || 'นาย';
+            document.getElementById('empNameTh').value = emp.nameTh || '';
+            document.getElementById('empPrefixEn').value = emp.prefixEn || '';
+            document.getElementById('empNameEn').value = emp.nameEn || '';
+            document.getElementById('empPosition').value = emp.position || '';
+            document.getElementById('empDept').value = emp.dept || '';
+            document.getElementById('empStartDate').value = emp.startDate || '';
+            document.getElementById('empProbationEndDate').value = emp.probationEndDate || '';
+            document.getElementById('empStatus').value = emp.status || 'ทำงานอยู่';
+            document.getElementById('empGender').value = emp.gender || 'ชาย';
+            document.getElementById('empBirthDate').value = emp.birthDate || '';
+            document.getElementById('empAge').value = emp.age || '';
+            document.getElementById('empBloodType').value = emp.bloodType || 'ไม่ระบุ';
+            document.getElementById('empIdCard').value = emp.idCard || '';
+            document.getElementById('empEthnicity').value = emp.ethnicity || 'ไทย';
+            document.getElementById('empNationality').value = emp.nationality || 'ไทย';
+            document.getElementById('empReligion').value = emp.religion || 'พุทธ';
+            document.getElementById('empCurrentAddress').value = emp.currentAddress || '';
+            document.getElementById('empCardAddress').value = emp.cardAddress || '';
+            document.getElementById('empPhone').value = emp.phone || '';
+            document.getElementById('empEmail').value = emp.email || '';
+            document.getElementById('empEmergencyPhone').value = emp.emergencyPhone || '';
+            document.getElementById('empEmergencyName').value = emp.emergencyName || '';
+            document.getElementById('empKasikornAcc').value = emp.kasikornAcc || '';
+            document.getElementById('empEducation').value = emp.education || 'ไม่ระบุ';
+            document.getElementById('empMajor').value = emp.major || '';
+            document.getElementById('empInstitute').value = emp.institute || '';
+            document.getElementById('empResignDate').value = emp.resignDate || '';
+            document.getElementById('empSsoHospital').value = emp.ssoHospital || '';
+
+            populateTrainingForm(emp.training);
+            calculateDatesAndTenure();
+
+            currentImageData = emp.photo || '';
+            if(emp.photo) {
+                const img = document.getElementById('imagePreview');
+                img.src = emp.photo;
+                img.classList.remove('hidden');
+                document.getElementById('imagePlaceholder').classList.add('hidden');
+            } else {
+                document.getElementById('imagePreview').classList.add('hidden');
+                document.getElementById('imagePlaceholder').classList.remove('hidden');
+            }
+
+            document.getElementById('employeeModal').classList.remove('hidden');
+            document.getElementById('employeeModal').classList.add('flex');
+        }
+
+        function deleteEmployee(code) {
+            targetDeleteCode = code;
+            document.getElementById('deleteMessage').innerHTML = `คุณแน่ใจหรือว่าต้องการลบพนักงานรหัส <span class="font-bold text-slate-800">${code}</span>?`;
+            document.getElementById('deleteModal').classList.remove('hidden');
+            document.getElementById('deleteModal').classList.add('flex');
+            lucide.createIcons();
+        }
+
+        function closeDeleteModal() {
+            document.getElementById('deleteModal').classList.add('hidden');
+            document.getElementById('deleteModal').classList.remove('flex');
+            targetDeleteCode = '';
+        }
+
+        async function executeDelete() {
+            if (targetDeleteCode) {
+                employees = employees.filter(e => String(e.code).trim() !== String(targetDeleteCode).trim());
+                await saveEmployeesToCloud();
+                closeDeleteModal();
+                updateDeptFilterOptions();
+                filterEmployees();
+            }
+        }
+
+        function viewEmployeeDetail(code) {
+            const emp = employees.find(e => e.code === code);
+            if (!emp) return;
+
+            currentViewEmpCode = emp.code;
+            const photoUrl = emp.photo || 'https://via.placeholder.com/150?text=No+Image';
+            const tenure = calculateTenure(emp.startDate, emp.resignDate);
+            const displayNameEn = (emp.nameEn && emp.nameEn.trim() !== '') ? `(${emp.prefixEn || ''} ${emp.nameEn})` : '';
+            
+            const formattedIdCard = formatIdCard(emp.idCard);
+
+            let trainingTableHtml = '';
+            const trainingList = parseTrainingData(emp.training);
+
+            if (trainingList.length > 0) {
+                trainingTableHtml = `
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left text-xs border-collapse">
+                            <thead>
+                                <tr class="bg-emerald-100/60 text-emerald-900 border-b border-emerald-200">
+                                    <th class="p-2 w-20 text-center font-bold">ปี พ.ศ.</th>
+                                    <th class="p-2 font-bold">ชื่อหลักสูตร / ใบรับรอง</th>
+                                    <th class="p-2 font-bold">สถาบันผู้ออกใบรับรอง</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-emerald-100">
+                                ${trainingList.map(t => `
+                                    <tr>
+                                        <td class="p-2 text-center font-semibold text-slate-600">${t.year || '-'}</td>
+                                        <td class="p-2 font-medium text-slate-800">${t.name || '-'}</td>
+                                        <td class="p-2 text-slate-600">${t.institute || '-'}</td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+                `;
+            } else {
+                trainingTableHtml = `<p class="text-xs text-slate-400 italic py-1">ไม่มีประวัติการอบรม</p>`;
+            }
+
+            const detailHtml = `
+                <div class="space-y-6 bg-white p-4">
+                    <div class="flex items-center justify-between border-b pb-3">
+                        <div class="flex items-center space-x-3">
+                            ${globalCompanyLogo ? `<img src="${globalCompanyLogo}" class="w-10 h-10 object-contain rounded border">` : '<div class="w-10 h-10 bg-emerald-800 text-white rounded flex items-center justify-center font-bold text-xs">HR</div>'}
+                            <div>
+                                <h3 class="font-bold text-slate-800 text-sm sm:text-base">${globalCompanyName}</h3>
+                                <p class="text-[11px] text-slate-500">แบบฟอร์มประวัติพนักงานและหลักสูตรอบรม</p>
+                            </div>
+                        </div>
+                        <span class="text-xs font-mono text-slate-400">วันที่พิมพ์: ${new Date().toLocaleDateString('th-TH', { day: 'numeric', month: 'long', year: 'numeric' })}</span>
+                    </div>
+
+                    <div class="flex flex-col sm:flex-row items-center gap-5 p-4 bg-slate-50 rounded-xl border border-slate-200">
+                        <img src="${photoUrl}" class="w-24 h-32 rounded object-cover border-2 border-emerald-600 shadow-md shrink-0" alt="profile">
+                        <div class="space-y-1 text-center sm:text-left">
+                            <span class="inline-block px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800">${emp.status}</span>
+                            <h2 class="text-xl font-bold text-slate-800">${emp.prefixTh || ''}${emp.nameTh} <span class="text-slate-500 font-normal text-base">${displayNameEn}</span></h2>
+                            <p class="text-sm font-medium text-emerald-700">${emp.position} | แผนก: ${emp.dept}</p>
+                            <p class="text-xs text-slate-500 font-mono">รหัสพนักงาน: ${emp.code}</p>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div class="space-y-4">
+                            <div class="border rounded-lg p-3.5 bg-white shadow-sm space-y-2">
+                                <h4 class="font-bold text-emerald-800 text-xs uppercase tracking-wider border-b pb-1">ข้อมูลการทำงาน</h4>
+                                <div class="grid grid-cols-2 gap-2 text-xs">
+                                    <div><span class="text-slate-400 block">วันที่เริ่มงาน:</span> <span class="font-medium text-slate-700">${formatDateToThaiBE(emp.startDate)}</span></div>
+                                    <div><span class="text-slate-400 block">วันสิ้นสุดทดลองงาน:</span> <span class="font-medium text-slate-700">${formatDateToThaiBE(emp.probationEndDate)}</span></div>
+                                    <div><span class="text-slate-400 block">อายุงานปัจจุบัน:</span> <span class="font-medium text-emerald-700">${tenure}</span></div>
+                                    <div><span class="text-slate-400 block">วันที่ลาออก:</span> <span class="font-medium text-rose-600">${formatDateToThaiBE(emp.resignDate)}</span></div>
+                                </div>
+                            </div>
+
+                            <div class="border rounded-lg p-3.5 bg-white shadow-sm space-y-2">
+                                <h4 class="font-bold text-emerald-800 text-xs uppercase tracking-wider border-b pb-1">ข้อมูลส่วนตัว</h4>
+                                <div class="grid grid-cols-2 gap-2 text-xs">
+                                    <div><span class="text-slate-400 block">เพศ:</span> <span class="font-medium text-slate-700">${emp.gender || '-'}</span></div>
+                                    <div><span class="text-slate-400 block">วันเกิด:</span> <span class="font-medium text-slate-700">${formatDateToThaiBE(emp.birthDate)}</span></div>
+                                    <div><span class="text-slate-400 block">อายุ:</span> <span class="font-medium text-slate-700">${emp.age ? emp.age + ' ปี' : '-'}</span></div>
+                                    <div><span class="text-slate-400 block">หมู่เลือด:</span> <span class="font-medium text-slate-700">${emp.bloodType || 'ไม่ระบุ'}</span></div>
+                                    <div class="col-span-2"><span class="text-slate-400 block">เลขบัตรประชาชน:</span> <span class="font-mono font-medium text-slate-700">${formattedIdCard}</span></div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="space-y-4">
+                            <div class="border rounded-lg p-3.5 bg-white shadow-sm space-y-2">
+                                <h4 class="font-bold text-emerald-800 text-xs uppercase tracking-wider border-b pb-1">การติดต่อ & ที่อยู่</h4>
+                                <div class="space-y-2 text-xs">
+                                    <div class="grid grid-cols-2 gap-2">
+                                        <div><span class="text-slate-400 block">เบอร์โทรศัพท์:</span> <span class="font-mono font-medium text-slate-700">${emp.phone || '-'}</span></div>
+                                        <div><span class="text-slate-400 block">อีเมล:</span> <span class="font-medium text-slate-700">${emp.email || '-'}</span></div>
+                                    </div>
+                                    <div><span class="text-slate-400 block">ที่อยู่ปัจจุบัน:</span> <span class="font-medium text-slate-700">${emp.currentAddress || '-'}</span></div>
+                                    <div><span class="text-slate-400 block">ที่อยู่ตามบัตรประชาชน:</span> <span class="font-medium text-slate-700">${emp.cardAddress || '-'}</span></div>
+                                </div>
+                            </div>
+
+                            <div class="border rounded-lg p-3.5 bg-white shadow-sm space-y-2">
+                                <h4 class="font-bold text-emerald-800 text-xs uppercase tracking-wider border-b pb-1">การศึกษา & การเงิน</h4>
+                                <div class="grid grid-cols-2 gap-2 text-xs">
+                                    <div><span class="text-slate-400 block">เลขบัญชี กสิกรไทย:</span> <span class="font-mono font-bold text-emerald-700">${emp.kasikornAcc || '-'}</span></div>
+                                    <div><span class="text-slate-400 block">วุฒิการศึกษา:</span> <span class="font-medium text-slate-700">${emp.education || 'ไม่ระบุ'}</span></div>
+                                    <div class="col-span-2"><span class="text-slate-400 block">สถาบันการศึกษา:</span> <span class="font-medium text-slate-700">${emp.institute || '-'}</span></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- ประวัติหลักสูตรอบรม -->
+                    <div class="border rounded-lg p-3.5 bg-emerald-50/40 shadow-sm space-y-2">
+                        <h4 class="font-bold text-emerald-800 text-xs uppercase tracking-wider border-b border-emerald-200 pb-1.5 flex items-center gap-1.5">
+                            <i data-lucide="award" class="w-4 h-4"></i> ประวัติหลักสูตรอบรม / ใบรับรอง (Training & Certifications)
+                        </h4>
+                        ${trainingTableHtml}
+                    </div>
+                </div>
+            `;
+
+            document.getElementById('detailCaptureArea').innerHTML = detailHtml;
+            document.getElementById('detailModal').classList.remove('hidden');
+            document.getElementById('detailModal').classList.add('flex');
+            lucide.createIcons();
+        }
+
+        function closeDetailModal() {
+            document.getElementById('detailModal').classList.add('hidden');
+            document.getElementById('detailModal').classList.remove('flex');
+        }
+
+        function printDetail() {
+            const emp = employees.find(e => e.code === currentViewEmpCode);
+            if (!emp) return;
+
+            const printWindow = window.open('', '_blank', 'width=900,height=700');
+            const tenure = calculateTenure(emp.startDate, emp.resignDate);
+            const photoUrl = emp.photo || 'https://via.placeholder.com/150?text=No+Image';
+            const displayNameEn = (emp.nameEn && emp.nameEn.trim() !== '') ? `(${emp.prefixEn || ''} ${emp.nameEn})` : '';
+            const formattedIdCard = formatIdCard(emp.idCard);
+            const trainingList = parseTrainingData(emp.training);
+
+            let trainingPrintHtml = '';
+            if (trainingList.length > 0) {
+                trainingPrintHtml = `
+                    <table style="width:100%; border-collapse:collapse; margin-top:5px; text-align:left;">
+                        <thead>
+                            <tr style="background-color:#d1fae5; border-bottom:1px solid #a7f3d0;">
+                                <th style="padding:6px; width:70px; text-align:center;">ปี พ.ศ.</th>
+                                <th style="padding:6px;">ชื่อหลักสูตร / ใบรับรอง</th>
+                                <th style="padding:6px;">สถาบันผู้ออกใบรับรอง</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${trainingList.map(t => `
+                                <tr style="border-bottom:1px solid #e2e8f0;">
+                                    <td style="padding:6px; text-align:center;">${t.year || '-'}</td>
+                                    <td style="padding:6px;">${t.name || '-'}</td>
+                                    <td style="padding:6px;">${t.institute || '-'}</td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                `;
+            } else {
+                trainingPrintHtml = `<p style="color:#94a3b8; font-style:italic;">ไม่มีประวัติการอบรม</p>`;
+            }
+
+            printWindow.document.write(`
+                <!DOCTYPE html>
+                <html lang="th">
+                <head>
+                    <meta charset="UTF-8">
+                    <title>พิมพ์ข้อมูลพนักงาน - ${emp.code}</title>
+                    <script src="https://cdn.tailwindcss.com"><\/script>
+                    <style>
+                        @import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&display=swap');
+                        body { font-family: 'Sarabun', sans-serif; padding: 20px; background: white; color: #1e293b; }
+                    </style>
+                </head>
+                <body onload="window.print(); window.close();">
+                    <div class="space-y-6 max-w-4xl mx-auto">
+                        <div class="flex items-center justify-between border-b pb-3">
+                            <div class="flex items-center space-x-3">
+                                ${globalCompanyLogo ? `<img src="${globalCompanyLogo}" class="w-10 h-10 object-contain rounded border">` : '<div class="w-10 h-10 bg-emerald-800 text-white rounded flex items-center justify-center font-bold text-xs">HR</div>'}
+                                <div>
+                                    <h3 class="font-bold text-slate-800 text-base">${globalCompanyName}</h3>
+                                    <p class="text-[11px] text-slate-500">แบบฟอร์มประวัติพนักงานและหลักสูตรอบรม</p>
+                                </div>
+                            </div>
+                            <span class="text-xs font-mono text-slate-400">วันที่พิมพ์: ${new Date().toLocaleDateString('th-TH', { day: 'numeric', month: 'long', year: 'numeric' })}</span>
+                        </div>
+
+                        <div class="flex items-center gap-5 p-4 bg-slate-50 rounded-xl border border-slate-200">
+                            <img src="${photoUrl}" class="w-24 h-32 rounded object-cover border-2 border-emerald-600 shadow-md shrink-0" alt="profile">
+                            <div class="space-y-1">
+                                <span class="inline-block px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800">${emp.status}</span>
+                                <h2 class="text-xl font-bold text-slate-800">${emp.prefixTh || ''}${emp.nameTh} <span class="text-slate-500 font-normal text-base">${displayNameEn}</span></h2>
+                                <p class="text-sm font-medium text-emerald-700">${emp.position} | แผนก: ${emp.dept}</p>
+                                <p class="text-xs text-slate-500 font-mono">รหัสพนักงาน: ${emp.code}</p>
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-4 text-xs">
+                            <div class="border rounded-lg p-3.5 space-y-2">
+                                <h4 class="font-bold text-emerald-800 uppercase border-b pb-1">ข้อมูลการทำงาน</h4>
+                                <p><strong>วันที่เริ่มงาน:</strong> ${formatDateToThaiBE(emp.startDate)}</p>
+                                <p><strong>วันสิ้นสุดทดลองงาน:</strong> ${formatDateToThaiBE(emp.probationEndDate)}</p>
+                                <p><strong>อายุงานปัจจุบัน:</strong> ${tenure}</p>
+                            </div>
+                            <div class="border rounded-lg p-3.5 space-y-2">
+                                <h4 class="font-bold text-emerald-800 uppercase border-b pb-1">ข้อมูลส่วนตัว</h4>
+                                <p><strong>เลขบัตรประชาชน:</strong> ${formattedIdCard}</p>
+                                <p><strong>วันเกิด:</strong> ${formatDateToThaiBE(emp.birthDate)} (อายุ ${emp.age || '-'} ปี)</p>
+                            </div>
+                        </div>
+
+                        <div class="border rounded-lg p-3.5 bg-emerald-50/40 space-y-2 text-xs">
+                            <h4 class="font-bold text-emerald-800 uppercase border-b pb-1">ประวัติหลักสูตรอบรม / ใบรับรอง (Training & Certifications)</h4>
+                            ${trainingPrintHtml}
+                        </div>
+                    </div>
+                </body>
+                </html>
+            `);
+            printWindow.document.close();
+        }
+
+        function exportTableAsImage() {
+            const element = document.getElementById('captureArea');
+            const noPrintElements = document.querySelectorAll('.no-print');
+            noPrintElements.forEach(el => el.style.display = 'none');
+
+            html2canvas(element, { scale: 2, useCORS: true }).then(canvas => {
+                noPrintElements.forEach(el => el.style.display = '');
+                const link = document.createElement('a');
+                link.download = `employee_table_${new Date().toISOString().slice(0,10)}.png`;
+                link.href = canvas.toDataURL('image/png');
+                link.click();
+            }).catch(err => {
+                noPrintElements.forEach(el => el.style.display = '');
+                alert('ไม่สามารถบันทึกรูปภาพได้: ' + err.message);
+            });
+        }
+
+        function exportDetailAsImage() {
+            const element = document.getElementById('detailCaptureArea');
+            html2canvas(element, { scale: 2, useCORS: true }).then(canvas => {
+                const link = document.createElement('a');
+                link.download = `employee_profile_${currentViewEmpCode}_${new Date().toISOString().slice(0,10)}.png`;
+                link.href = canvas.toDataURL('image/png');
+                link.click();
+            }).catch(err => {
+                alert('ไม่สามารถบันทึกรูปภาพได้: ' + err.message);
+            });
+        }
+
+        function exportToCSV() {
+            try {
+                let csvContent = "\uFEFF"; 
+                const headers = [
+                    "รหัสพนักงาน", "คำนำหน้า (ไทย)", "ชื่อ-สกุล จริง (ไทย)", "คำนำหน้า (อังกฤษ)", "ชื่อ-สกุล (อังกฤษ)",
+                    "ตำแหน่ง", "แผนก/ฝ่าย", "วันที่เริ่มงาน", "วันสิ้นสุดทดลองงาน 90 วัน", "อายุงาน", "สถานะพนักงาน",
+                    "เพศ", "วัน/เดือน/ปีพ.ศ.เกิด", "อายุ", "หมู่เลือด", "เลขที่บัตรประชาชน", "เชื้อชาติ", "สัญชาติ", "ศาสนา",
+                    "ที่อยู่ปัจจุบัน", "ที่อยู่ตามบัตรประชาชน", "เบอร์โทรศัพท์", "อีเมล", "ชื่อบุคคลติดต่อฉุกเฉิน",
+                    "เบอร์ติดต่อฉุกเฉิน", "เลขที่บัญชีกสิกรไทย", "วุฒิการศึกษา", "สาขาวิชา", "สถาบันการศึกษา",
+                    "วันที่ลาออก", "โรงพยาบาลประกันสังคม", "ประวัติหลักสูตรอบรม", "รูปถ่ายพนักงาน"
+                ];
+
+                csvContent += headers.map(h => `"${h}"`).join(",") + "\n";
+
+                employees.forEach(emp => {
+                    const tenure = calculateTenure(emp.startDate, emp.resignDate);
+                    const trainingList = parseTrainingData(emp.training);
+                    const trainingStr = JSON.stringify(trainingList);
+
+                    const row = [
+                        emp.code || '',
+                        emp.prefixTh || '',
+                        emp.nameTh || '',
+                        emp.prefixEn || '',
+                        emp.nameEn || '',
+                        emp.position || '',
+                        emp.dept || '',
+                        emp.startDate || '',
+                        emp.probationEndDate || '',
+                        tenure,
+                        emp.status || '',
+                        emp.gender || '',
+                        emp.birthDate || '',
+                        emp.age || '',
+                        emp.bloodType || 'ไม่ระบุ',
+                        emp.idCard || '',
+                        emp.ethnicity || '',
+                        emp.nationality || '',
+                        emp.religion || '',
+                        emp.currentAddress || '',
+                        emp.cardAddress || '',
+                        emp.phone || '',
+                        emp.email || '',
+                        emp.emergencyName || '',
+                        emp.emergencyPhone || '',
+                        emp.kasikornAcc || '',
+                        emp.education || 'ไม่ระบุ',
+                        emp.major || '',
+                        emp.institute || '',
+                        emp.resignDate || '',
+                        emp.ssoHospital || '',
+                        trainingStr,
+                        emp.photo || ''
+                    ];
+
+                    csvContent += row.map(val => `"${String(val).replace(/"/g, '""')}"`).join(",") + "\n";
+                });
+
+                const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement("a");
+                link.href = url;
+                link.download = `employee_directory_${new Date().toISOString().slice(0,10)}.csv`;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            } catch (err) {
+                alert("เกิดข้อผิดพลาดในการส่งออกไฟล์: " + err.message);
+            }
+        }
+    </script>
+</body>
+</html>
